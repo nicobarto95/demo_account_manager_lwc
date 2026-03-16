@@ -1,0 +1,144 @@
+<!--
+    @description Template LWC ridisegnato — Account Manager con UI professionale.
+                 Fix: footer paginazione con layout flex corretto (no overflow).
+                 Design: clean enterprise, header sfumato, badge colorati, hover states.
+-->
+<template>
+    <div class="at-wrapper">
+        <div class="at-card">
+
+            <!-- HEADER -->
+            <div class="at-card__header">
+                <div class="at-header__left">
+                    <div class="at-header__icon">
+                        <lightning-icon icon-name="standard:account" size="small"></lightning-icon>
+                    </div>
+                    <div>
+                        <h1 class="at-header__title">Account Manager</h1>
+                        <p class="at-header__subtitle">
+                            <template lwc:if={totalRecords}>{totalRecords} account totali</template>
+                        </p>
+                    </div>
+                </div>
+                <div class="at-header__right">
+                    <template lwc:if={selectedCount}>
+                        <span class="at-badge at-badge--selected">{selectedCount} selezionati</span>
+                    </template>
+                    <lightning-button
+                        label="✎ Mass Update"
+                        class="at-mass-btn"
+                        disabled={isMassUpdateDisabled}
+                        onclick={handleMassUpdate}
+                        variant="brand"
+                    ></lightning-button>
+                </div>
+            </div>
+
+            <!-- BODY -->
+            <div class="at-card__body">
+
+                <!-- LOADING -->
+                <template lwc:if={isLoading}>
+                    <div class="at-state">
+                        <lightning-spinner alternative-text="Caricamento..." size="medium" variant="brand"></lightning-spinner>
+                        <p class="at-state__text">Caricamento record…</p>
+                    </div>
+                </template>
+
+                <!-- ERRORE -->
+                <template lwc:elseif={hasError}>
+                    <div class="at-state at-state--error">
+                        <p class="at-state__text">⚠ {errorMessage}</p>
+                    </div>
+                </template>
+
+                <!-- TABELLA -->
+                <template lwc:elseif={hasData}>
+                    <div class="at-table-scroll">
+                        <table class="at-table">
+                            <thead>
+                                <tr>
+                                    <th class="at-th at-th--chk">
+                                        <input type="checkbox" class="at-chk" checked={allSelected} onchange={handleSelectAll} title="Seleziona tutti" />
+                                    </th>
+                                    <template for:each={columns} for:item="col">
+                                        <th key={col.fieldName} class="at-th at-th--sort" onclick={handleSort} data-field={col.fieldName}>
+                                            <span class="at-th__inner">
+                                                {col.label}
+                                                <span class="at-th__sort">{col.sortIcon}</span>
+                                            </span>
+                                        </th>
+                                    </template>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template for:each={records} for:item="acc">
+                                    <tr key={acc.Id} class={acc.rowClass}>
+                                        <td class="at-td at-td--chk">
+                                            <input type="checkbox" class="at-chk" data-id={acc.Id} checked={acc.isSelected} onchange={handleRowSelect} />
+                                        </td>
+                                        <td class="at-td at-td--name">
+                                            <a href={acc.recordUrl} target="_blank" class="at-link">{acc.Name}</a>
+                                        </td>
+                                        <td class="at-td">
+                                            <template lwc:if={acc.Type}>
+                                                <span class={acc.typeBadgeClass}>{acc.Type}</span>
+                                            </template>
+                                            <template lwc:else><span class="at-nil">—</span></template>
+                                        </td>
+                                        <td class="at-td">
+                                            <template lwc:if={acc.Phone}>
+                                                <lightning-formatted-phone value={acc.Phone}></lightning-formatted-phone>
+                                            </template>
+                                            <template lwc:else><span class="at-nil">—</span></template>
+                                        </td>
+                                        <td class="at-td at-td--date">
+                                            <lightning-formatted-date-time value={acc.CreatedDate} year="numeric" month="short" day="2-digit"></lightning-formatted-date-time>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- FOOTER PAGINAZIONE -->
+                    <div class="at-footer">
+                        <span class="at-footer__info">
+                            Pagina <b>{currentPage}</b> di <b>{totalPages}</b>
+                        </span>
+
+                        <div class="at-footer__nav">
+                            <button class="at-pgbtn" disabled={isFirstPage} onclick={handleFirst}>«</button>
+                            <button class="at-pgbtn" disabled={isFirstPage} onclick={handlePrevious}>‹</button>
+                            <span class="at-footer__cur">{currentPage}</span>
+                            <button class="at-pgbtn" disabled={isLastPage} onclick={handleNext}>›</button>
+                            <button class="at-pgbtn" disabled={isLastPage} onclick={handleLast}>»</button>
+                        </div>
+
+                        <div class="at-footer__size">
+                            <label class="at-footer__size-lbl">Righe</label>
+                            <lightning-combobox
+                                name="pageSize"
+                                label="Righe"
+                                variant="label-hidden"
+                                value={pageSizeString}
+                                options={pageSizeOptions}
+                                onchange={handlePageSizeChange}
+                                class="at-combobox"
+                                dropdown-alignment="bottom-right"
+                            ></lightning-combobox>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- VUOTO -->
+                <template lwc:elseif={isEmpty}>
+                    <div class="at-state">
+                        <p class="at-state__text">Nessun account trovato.</p>
+                    </div>
+                </template>
+
+            </div>
+        </div>
+    </div>
+</template>
