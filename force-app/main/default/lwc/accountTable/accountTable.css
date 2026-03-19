@@ -50,7 +50,7 @@
     background: var(--at-white);
     border-radius: var(--at-radius);
     box-shadow: var(--at-shadow-lg);
-    overflow: hidden;
+    overflow: visible;        /* FIX: era hidden, bloccava il dropdown del combobox */
     border: 1px solid var(--at-slate-300);
 }
 
@@ -230,6 +230,18 @@
 .at-td--name { font-weight: 500; }
 .at-td--date { color: var(--at-slate-500); font-size: .8125rem; white-space: nowrap; }
 
+.at-td--description { max-width: 220px; }
+.at-description {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 220px;
+    font-size: .8125rem;
+    color: var(--at-slate-500);
+    font-style: italic;
+}
+
 /* ── Link account ───────────────────────────────────────────────── */
 .at-link {
     color: var(--at-blue);
@@ -287,12 +299,14 @@
 .at-footer {
     display: flex;
     align-items: center;
-    justify-content: space-between;   /* info | nav | size */
+    justify-content: space-between;
     padding: .875rem 1.25rem;
     border-top: 1px solid var(--at-slate-100);
     background: var(--at-slate-100);
     gap: 1rem;
-    flex-wrap: nowrap;                /* mai a capo */
+    flex-wrap: nowrap;
+    overflow: visible;        /* FIX: permette al dropdown di aprirsi fuori dai bordi */
+    position: relative;       /* FIX: contesto per il posizionamento del dropdown */
 }
 
 /* Colonna sinistra: info pagina */
