@@ -55,7 +55,8 @@ export default class AccountTable extends LightningElement {
     currentPage  = 1;
     totalPages   = 1;
     totalRecords = 0;
-    @api pageSize     = 10;
+    @api pageSize = 10;
+    _pageSize = 10; // copia interna modificabile a runtime
 
     // Ordinamento
     sortField     = 'Name';
@@ -70,6 +71,7 @@ export default class AccountTable extends LightningElement {
     // ─────────────────────────────────────────────
 
     connectedCallback() {
+        this._pageSize = this.pageSize; // copia il valore @api nella proprietà interna modificabile
         this.loadAccounts();
     }
 
@@ -94,7 +96,7 @@ export default class AccountTable extends LightningElement {
 
     get pageSizeOptions() { return PAGE_SIZE_OPTIONS; }
     // lightning-combobox richiede che value sia una stringa, non un intero
-    get pageSizeString()  { return String(this.pageSize); }
+    get pageSizeString()  { return String(this._pageSize); }
 
     // ─────────────────────────────────────────────
     // DATA LOADING
@@ -113,7 +115,7 @@ export default class AccountTable extends LightningElement {
         try {
             const result = await getAccounts({
                 pageNumber:    this.currentPage,
-                pageSize:      this.pageSize,
+                pageSize:      this._pageSize,
                 sortField:     this.sortField,
                 sortDirection: this.sortDirection
             });
@@ -185,9 +187,8 @@ export default class AccountTable extends LightningElement {
         const raw = event.detail.value;
         const parsed = parseInt(raw, 10);
 
-        console.log('[PageSize Debug]', { raw, parsed });
 
-        this.pageSize    = parsed;
+        this._pageSize   = parsed;
         this.currentPage = 1;
         this.loadAccounts();
     }

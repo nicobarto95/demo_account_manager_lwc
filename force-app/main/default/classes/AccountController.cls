@@ -56,7 +56,7 @@ public with sharing class AccountController {
      * @param sortDirection Direzione di ordinamento ('ASC' o 'DESC')
      * @return              AccountPage con records e metadati
      */
-    @AuraEnabled(cacheable=true)
+    @AuraEnabled
     public static AccountPage getAccounts(
         Integer pageNumber,
         Integer pageSize,
@@ -102,7 +102,7 @@ public with sharing class AccountController {
         // Per dataset > 200k righe, considera Cursor-based Pagination
         // (usando l'Id dell'ultimo record come "cursor").
         String soqlQuery =
-            'SELECT Id, Name, Type, Phone, CreatedDate ' +
+            'SELECT Id, Name, Type, Phone, CreatedDate, Description ' +
             'FROM   Account ' +
             'WITH   USER_MODE ' +
             'ORDER BY ' + sortField + ' ' + sortDirection + ' NULLS LAST ' +

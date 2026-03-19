@@ -3,14 +3,12 @@
     <apiVersion>59.0</apiVersion>
     <isExposed>true</isExposed>
     <targets>
-        <!-- Rende il componente disponibile in App Builder, Home e Record Page -->
         <target>lightning__AppPage</target>
         <target>lightning__HomePage</target>
         <target>lightning__RecordPage</target>
     </targets>
     <targetConfigs>
         <targetConfig targets="lightning__AppPage,lightning__HomePage">
-            <!-- Proprietà configurabile da App Builder senza toccare il codice -->
             <property
                 name="pageSize"
                 type="Integer"
