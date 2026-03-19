@@ -92,6 +92,12 @@
                                             </template>
                                             <template lwc:else><span class="at-nil">—</span></template>
                                         </td>
+                                        <td class="at-td at-td--description">
+                                            <template lwc:if={acc.Description}>
+                                                <span class="at-description">{acc.Description}</span>
+                                            </template>
+                                            <template lwc:else><span class="at-nil">—</span></template>
+                                        </td>
                                         <td class="at-td at-td--date">
                                             <lightning-formatted-date-time value={acc.CreatedDate} year="numeric" month="short" day="2-digit"></lightning-formatted-date-time>
                                         </td>
@@ -124,8 +130,8 @@
                                 value={pageSizeString}
                                 options={pageSizeOptions}
                                 onchange={handlePageSizeChange}
-                                class="at-combobox"
                                 dropdown-alignment="bottom-right"
+                                class="at-combobox"
                             ></lightning-combobox>
                         </div>
                     </div>

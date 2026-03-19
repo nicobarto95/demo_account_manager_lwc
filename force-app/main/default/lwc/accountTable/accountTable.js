@@ -25,6 +25,7 @@ const COLUMNS = [
     { label: 'Name',         fieldName: 'Name',        isSorted: false, sortIcon: '' },
     { label: 'Type',         fieldName: 'Type',        isSorted: false, sortIcon: '' },
     { label: 'Phone',        fieldName: 'Phone',       isSorted: false, sortIcon: '' },
+    { label: 'Description',  fieldName: 'Description', isSorted: false, sortIcon: '' },
     { label: 'Created Date', fieldName: 'CreatedDate', isSorted: false, sortIcon: '' },
 ];
 
@@ -93,10 +94,7 @@ export default class AccountTable extends LightningElement {
 
     get pageSizeOptions() { return PAGE_SIZE_OPTIONS; }
     // lightning-combobox richiede che value sia una stringa, non un intero
-    // Aggiungi questo getter nel file .js
-    get pageSizeString() {
-        return this.pageSize.toString();
-    }
+    get pageSizeString()  { return String(this.pageSize); }
 
     // ─────────────────────────────────────────────
     // DATA LOADING
@@ -242,7 +240,7 @@ export default class AccountTable extends LightningElement {
     async handleMassUpdate() {
         if (this.selectedIds.size === 0) return;
 
-        const newDescription = `Aggiornato in massa il ${new Date().toLocaleString('it-IT')}`;
+        const newDescription = `Update ${new Date().toLocaleString('it-IT')}`;
         const ids = Array.from(this.selectedIds.keys());
 
         this.isLoading = true;
