@@ -1,6 +1,7 @@
 /**
- * @description Controller Apex per la gestione paginata e ordinata degli Account.
- *              Espone metodi @AuraEnabled per LWC con focus su sicurezza e bulkification.
+ * @description Apex controller for paginated and sorted Account management.
+ *              Exposes @AuraEnabled methods for LWC with a focus on security
+ *              and bulkification best practices.
  * @author      Nicola Bartolini
  */
 public with sharing class AccountController {
@@ -10,51 +11,56 @@ public with sharing class AccountController {
     // ─────────────────────────────────────────────
 
     /**
-     * @description DTO che incapsula sia i record della pagina corrente
-     *              sia i metadati di paginazione. Riduce il numero di chiamate
-     *              Apex da 2 (getData + getCount) a 1 sola chiamata.
+     * @description DTO that wraps both the current page records and pagination
+     *              metadata. Reduces Apex round-trips from 2 (getData + getCount)
+     *              down to a single call.
      */
     public class AccountPage {
         @AuraEnabled public List<Account> records { get; set; }
-        @AuraEnabled public Integer totalRecords { get; set; }
-        @AuraEnabled public Integer totalPages { get; set; }
-        @AuraEnabled public Integer currentPage { get; set; }
+        @AuraEnabled public Integer totalRecords  { get; set; }
+        @AuraEnabled public Integer totalPages    { get; set; }
+        @AuraEnabled public Integer currentPage   { get; set; }
     }
 
     /**
-     * @description DTO per il risultato dell'operazione di mass update.
-     *              Permette di restituire sia un flag di successo sia un messaggio
-     *              di errore senza dover gestire eccezioni lato JS.
+     * @description DTO for the mass update operation result.
+     *              Returns both a success flag and a human-readable message
+     *              without relying on JS-side exception handling.
      */
     public class MassUpdateResult {
-        @AuraEnabled public Boolean success { get; set; }
-        @AuraEnabled public String message { get; set; }
+        @AuraEnabled public Boolean success      { get; set; }
+        @AuraEnabled public String  message      { get; set; }
         @AuraEnabled public Integer updatedCount { get; set; }
     }
 
     // ─────────────────────────────────────────────
-    // METODI PRINCIPALI
+    // PUBLIC METHODS
     // ─────────────────────────────────────────────
 
     /**
-     * @description Recupera una pagina di Account con supporto a paginazione e ordinamento.
+     * @description Retrieves a page of Account records with pagination and sorting support.
      *
-     * SCELTA ARCHITETTURALE - Server-Side Sorting:
-     * L'ordinamento avviene in SOQL (ORDER BY) e non in JavaScript.
-     * Motivo: con un dataset di 100k record, ordinare lato client richiederebbe
-     * di caricare tutti i record in memoria. Con l'approccio server-side, ogni
-     * query ritorna SOLO i record della pagina corrente (es. 10 record).
+     * ARCHITECTURAL DECISION — Server-Side Sorting:
+     * Sorting is performed via SOQL ORDER BY, not in JavaScript.
+     * Reason: with a dataset of 100k records, client-side sorting would require
+     * loading all records into memory. With server-side sorting, each query
+     * returns ONLY the records for the current page (e.g. 10 records).
      *
-     * SCELTA ARCHITETTURALE - WITH USER_MODE:
-     * Utilizziamo WITH USER_MODE invece di with sharing + Security.stripInaccessible
-     * perché è più conciso e gestisce automaticamente sia FLS che CRUD enforcement.
-     * Disponibile da API v56.0+.
+     * ARCHITECTURAL DECISION — WITH USER_MODE:
+     * We use WITH USER_MODE instead of with sharing + Security.stripInaccessible
+     * because it is more concise and automatically enforces both FLS and CRUD.
+     * Available from API v56.0+.
      *
-     * @param pageNumber    Numero della pagina (1-based)
-     * @param pageSize      Numero di record per pagina
-     * @param sortField     Campo su cui ordinare (es. 'Name')
-     * @param sortDirection Direzione di ordinamento ('ASC' o 'DESC')
-     * @return              AccountPage con records e metadati
+     * KNOWN LIMITATION — SOQL OFFSET:
+     * SOQL OFFSET has a hard limit of 2000 records. For datasets larger than
+     * ~200k rows consider switching to Cursor-based Pagination using the last
+     * record Id as the cursor.
+     *
+     * @param pageNumber    Page number (1-based index)
+     * @param pageSize      Number of records per page
+     * @param sortField     Field to sort by (e.g. 'Name')
+     * @param sortDirection Sort direction ('ASC' or 'DESC')
+     * @return              AccountPage containing records and pagination metadata
      */
     @AuraEnabled
     public static AccountPage getAccounts(
@@ -63,99 +69,104 @@ public with sharing class AccountController {
         String  sortField,
         String  sortDirection
     ) {
-        // ── Validazione Input (prevenzione SOQL Injection) ──────────────────
-        // Non usiamo mai String.format diretto con input utente in SOQL.
-        // Whitelist sui campi ordinabili: accettiamo SOLO campi noti.
+        // ── Input Validation — SOQL Injection Prevention ────────────────────
+        // Never concatenate raw user input directly into a SOQL string.
+        // Accept ONLY known, whitelisted field names for ORDER BY.
+        // Note: Description is intentionally excluded — textarea fields
+        // cannot be used in ORDER BY clauses.
         Set<String> allowedSortFields = new Set<String>{
             'Name', 'Type', 'Phone', 'CreatedDate'
         };
         if (!allowedSortFields.contains(sortField)) {
             sortField = 'Name';
         }
-        // Whitelist sulla direzione
+
+        // Whitelist on sort direction — accept only DESC, default to ASC
         sortDirection = (sortDirection == 'DESC') ? 'DESC' : 'ASC';
 
-        // Sanitizza pageSize e pageNumber
+        // Sanitize pageSize and pageNumber — fall back to safe defaults if null or invalid
         pageSize   = (pageSize   != null && pageSize   > 0) ? pageSize   : 10;
         pageNumber = (pageNumber != null && pageNumber > 0) ? pageNumber : 1;
 
-        // ── Conteggio Totale Record ──────────────────────────────────────────
-        // WITH USER_MODE: applica FLS e CRUD dell'utente corrente.
-        // Nota: la count() è separata dalla query dati per efficienza.
+        // ── Total Record Count ───────────────────────────────────────────────
+        // WITH USER_MODE enforces the running user's FLS and CRUD permissions.
+        // Count query is kept separate from the data query for clarity.
         Integer totalRecords = [
             SELECT COUNT()
             FROM   Account
             WITH   USER_MODE
         ];
 
-        // ── Calcolo Metadati Paginazione ─────────────────────────────────────
+        // ── Pagination Metadata ──────────────────────────────────────────────
+        // Cast to Double before dividing to avoid integer truncation (e.g. 13/10 = 1, not 1.3)
         Integer totalPages = (Integer) Math.ceil((Double) totalRecords / pageSize);
-        totalPages = Math.max(totalPages, 1); // Evita divisione per zero
+        totalPages = Math.max(totalPages, 1); // Guard against empty dataset returning 0 pages
 
-        // Assicura che pageNumber non superi il totale
+        // Clamp pageNumber to a valid range — prevents out-of-bounds OFFSET
         pageNumber = Math.min(pageNumber, totalPages);
 
         Integer offsetValue = (pageNumber - 1) * pageSize;
 
-        // ── Query Dati con OFFSET e ORDER BY ─────────────────────────────────
-        // LIMITAZIONE NOTA: SOQL OFFSET ha un limite di 2000 record.
-        // Per dataset > 200k righe, considera Cursor-based Pagination
-        // (usando l'Id dell'ultimo record come "cursor").
+        // ── Data Query ───────────────────────────────────────────────────────
+        // sortField is safe to concatenate here because it has been validated
+        // against the whitelist above. Bind variables (:pageSize, :offsetValue)
+        // are used for all other dynamic values to prevent injection.
         String soqlQuery =
-            'SELECT Id, Name, Type, Phone, CreatedDate, Description ' +
-            'FROM   Account ' +
-            'WITH   USER_MODE ' +
+            'SELECT Id, Name, Type, Phone, Description, CreatedDate ' +
+            'FROM   Account '                                          +
+            'WITH   USER_MODE '                                        +
             'ORDER BY ' + sortField + ' ' + sortDirection + ' NULLS LAST ' +
-            'LIMIT  :pageSize ' +
+            'LIMIT  :pageSize '                                        +
             'OFFSET :offsetValue';
 
         List<Account> records = Database.query(soqlQuery);
 
-        // ── Costruzione risposta ─────────────────────────────────────────────
-        AccountPage result    = new AccountPage();
-        result.records        = records;
-        result.totalRecords   = totalRecords;
-        result.totalPages     = totalPages;
-        result.currentPage    = pageNumber;
+        // ── Build and Return Response ────────────────────────────────────────
+        AccountPage result  = new AccountPage();
+        result.records      = records;
+        result.totalRecords = totalRecords;
+        result.totalPages   = totalPages;
+        result.currentPage  = pageNumber;
 
         return result;
     }
 
     /**
-     * @description Aggiorna il campo Description per una lista di Account ID.
+     * @description Updates the Description field for a list of Account IDs.
      *
-     * SCELTA ARCHITETTURALE - Bulkification:
-     * Il metodo riceve una LISTA di ID (non un singolo ID) e usa una singola
-     * DML operation (update). Questo rispetta il pattern Bulkification:
-     * - 1 SOQL query invece di N query in un loop
-     * - 1 DML statement invece di N DML in un loop
-     * Non cacheable=true perché modifica dati.
+     * ARCHITECTURAL DECISION — Bulkification:
+     * The method accepts a LIST of IDs (not a single ID) and performs a single
+     * DML operation. This follows the Bulkification pattern:
+     * - 0 SOQL queries (IDs are already known, no SELECT needed)
+     * - 1 DML statement regardless of how many records are updated
+     * Not marked cacheable=true because this method writes data.
      *
-     * SICUREZZA: with sharing è dichiarato a livello di classe.
-     * Database.update con allOrNothing=false gestisce errori parziali
-     * e permette di restituire un report dettagliato.
+     * SECURITY: sharing rules are enforced at class level via 'with sharing'.
+     * Database.update with allOrNothing=false allows partial saves and returns
+     * a detailed per-record result report.
      *
-     * @param accountIds    Lista degli ID degli Account da aggiornare
-     * @param newDescription Nuovo valore per il campo Description
-     * @return              MassUpdateResult con esito operazione
+     * @param accountIds     List of Account IDs to update
+     * @param newDescription New value for the Description field
+     * @return               MassUpdateResult with operation outcome
      */
     @AuraEnabled
     public static MassUpdateResult massUpdateAccounts(
-        List<Id>   accountIds,
-        String     newDescription
+        List<Id> accountIds,
+        String   newDescription
     ) {
         MassUpdateResult result = new MassUpdateResult();
 
-        // ── Validazione Input ────────────────────────────────────────────────
+        // ── Input Validation ─────────────────────────────────────────────────
         if (accountIds == null || accountIds.isEmpty()) {
             result.success = false;
-            result.message = 'Nessun record selezionato.';
+            result.message = 'No records selected.';
             return result;
         }
 
-        // ── Preparazione Record (Bulkification) ──────────────────────────────
-        // Costruiamo la lista in-memory senza query SOQL:
-        // sappiamo già gli ID, quindi non serve un SELECT.
+        // ── Build Update List in Memory (Bulkification) ──────────────────────
+        // Construct partial Account objects with only Id + Description.
+        // Salesforce recognises the presence of an Id as an update operation —
+        // there is no need to SELECT the full record first.
         List<Account> accountsToUpdate = new List<Account>();
         for (Id accId : accountIds) {
             accountsToUpdate.add(new Account(
@@ -164,16 +175,16 @@ public with sharing class AccountController {
             ));
         }
 
-        // ── DML con gestione errori parziali ─────────────────────────────────
-        // allOrNothing=false: se 1 record fallisce, gli altri vengono salvati.
-        // In un contesto reale, valuta se preferisci allOrNothing=true
-        // per garantire atomicità della transazione.
+        // ── DML with Partial Error Handling ──────────────────────────────────
+        // allOrNothing=false: if one record fails (e.g. validation rule),
+        // the remaining records are still saved.
+        // Switch to allOrNothing=true if atomic behaviour is required.
         List<Database.SaveResult> saveResults = Database.update(
             accountsToUpdate,
             false // allOrNothing
         );
 
-        // ── Analisi risultati ─────────────────────────────────────────────────
+        // ── Analyse Save Results ─────────────────────────────────────────────
         Integer successCount = 0;
         List<String> errors  = new List<String>();
 
@@ -190,8 +201,8 @@ public with sharing class AccountController {
         result.success      = errors.isEmpty();
         result.updatedCount = successCount;
         result.message      = errors.isEmpty()
-            ? successCount + ' record aggiornati con successo.'
-            : 'Aggiornamento parziale. Errori: ' + String.join(errors, '; ');
+            ? successCount + ' record(s) updated successfully.'
+            : 'Partial update. Errors: ' + String.join(errors, '; ');
 
         return result;
     }

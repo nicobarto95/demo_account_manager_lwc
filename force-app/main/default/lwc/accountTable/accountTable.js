@@ -1,34 +1,44 @@
 /**
- * @description Controller JS per accountTable LWC.
- *              Gestisce stato di paginazione, ordinamento, selezione e mass update.
+ * @description JS controller for the accountTable LWC.
+ *              Manages pagination state, column sorting, row selection,
+ *              and the mass update operation.
  *
- * PATTERN ARCHITETTURALE:
- * - Stato centralizzato in proprietà reactive (@track implicito in LWC moderno)
- * - Separazione netta tra: gestione stato UI / chiamate Apex / gestione errori
- * - wire non usato intenzionalmente: getAccounts ha parametri dinamici
- *   (page, sort), quindi usiamo chiamate imperative con refreshApex manuale.
+ * ARCHITECTURAL PATTERNS:
+ * - Centralised state via reactive properties (@track for objects/arrays)
+ * - Clear separation between: UI state management / Apex calls / error handling
+ * - Imperative Apex calls instead of @wire: getAccounts has multiple dynamic
+ *   parameters (page, sort, pageSize) that change together. Using @wire would
+ *   fire a separate Apex call for each individual property change, resulting in
+ *   redundant network requests. The imperative approach guarantees exactly one
+ *   call per user interaction.
  *
- * @author  Senior Technical Architect Demo
+ * @author  Nicola Bartolini
  * @version 1.0
  */
 import { LightningElement, track, api } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
-import getAccounts       from '@salesforce/apex/AccountController.getAccounts';
+import getAccounts        from '@salesforce/apex/AccountController.getAccounts';
 import massUpdateAccounts from '@salesforce/apex/AccountController.massUpdateAccounts';
 
 // ─────────────────────────────────────────────
-// COSTANTI
+// CONSTANTS
 // ─────────────────────────────────────────────
 
-/** Definizione colonne: fieldName corrisponde ai campi SOQL */
+/**
+ * Column definitions. fieldName must match the SOQL field API name exactly.
+ * sortable: false prevents the column header from triggering an ORDER BY call.
+ * Description is excluded from sorting — long textarea fields cannot be indexed
+ * by Salesforce and will throw a runtime error if used in ORDER BY.
+ */
 const COLUMNS = [
-    { label: 'Name',         fieldName: 'Name',        isSorted: false, sortIcon: '' },
-    { label: 'Type',         fieldName: 'Type',        isSorted: false, sortIcon: '' },
-    { label: 'Phone',        fieldName: 'Phone',       isSorted: false, sortIcon: '' },
-    { label: 'Description',  fieldName: 'Description', isSorted: false, sortIcon: '' },
-    { label: 'Created Date', fieldName: 'CreatedDate', isSorted: false, sortIcon: '' },
+    { label: 'Name',         fieldName: 'Name',        isSorted: false, sortIcon: '', sortable: true  },
+    { label: 'Type',         fieldName: 'Type',        isSorted: false, sortIcon: '', sortable: true  },
+    { label: 'Phone',        fieldName: 'Phone',       isSorted: false, sortIcon: '', sortable: true  },
+    { label: 'Description',  fieldName: 'Description', isSorted: false, sortIcon: '', sortable: false },
+    { label: 'Created Date', fieldName: 'CreatedDate', isSorted: false, sortIcon: '', sortable: true  },
 ];
 
+/** Options for the rows-per-page combobox. Values must be strings — lightning-combobox requirement. */
 const PAGE_SIZE_OPTIONS = [
     { label: '5',  value: '5'  },
     { label: '10', value: '10' },
@@ -39,30 +49,50 @@ const PAGE_SIZE_OPTIONS = [
 export default class AccountTable extends LightningElement {
 
     // ─────────────────────────────────────────────
-    // STATE (reactive properties)
+    // STATE
     // ─────────────────────────────────────────────
 
-    /** Copia profonda delle colonne per modificare isSorted senza mutare COLUMNS */
-    @track columns = JSON.parse(JSON.stringify(COLUMNS));
+    /**
+     * Column state including sort indicators and CSS classes.
+     * @track is required so LWC detects mutations to nested object properties.
+     * thClass is pre-computed here to avoid repeated ternary logic in the template.
+     */
+    @track columns = COLUMNS.map(c => ({
+        ...c,
+        thClass: c.sortable ? 'at-th at-th--sort' : 'at-th'
+    }));
 
-    /** Record della pagina corrente con proprietà aggiuntive per la UI */
+    /** Records for the current page, enriched with UI-specific properties. */
     @track records = [];
 
-    /** Mappa Id → boolean per tracciare selezioni (più efficiente di un array) */
+    /**
+     * Map of selected record IDs → true.
+     * A Map is used instead of an Array because Map.has(id) is O(1),
+     * while Array.includes(id) is O(n). Reassignment (not mutation) is required
+     * to trigger LWC reactivity.
+     */
     @track selectedIds = new Map();
 
-    // Paginazione
+    // Pagination
     currentPage  = 1;
     totalPages   = 1;
     totalRecords = 0;
-    @api pageSize = 10;
-    _pageSize = 10; // copia interna modificabile a runtime
 
-    // Ordinamento
+    /**
+     * Public page size property configurable via App Builder (js-meta.xml).
+     * @api makes it read-only inside the component, so all runtime changes
+     * are managed through the private _pageSize copy below.
+     */
+    @api pageSize = 10;
+
+    /** Internal mutable copy of pageSize used for all runtime logic. */
+    _pageSize = 10;
+
+    // Sorting
     sortField     = 'Name';
     sortDirection = 'ASC';
 
-    // UI State
+    // UI flags
     isLoading    = false;
     errorMessage = '';
 
@@ -71,12 +101,14 @@ export default class AccountTable extends LightningElement {
     // ─────────────────────────────────────────────
 
     connectedCallback() {
-        this._pageSize = this.pageSize; // copia il valore @api nella proprietà interna modificabile
+        // Copy the @api value into the internal property so App Builder
+        // configuration is respected, while still allowing runtime changes.
+        this._pageSize = this.pageSize;
         this.loadAccounts();
     }
 
     // ─────────────────────────────────────────────
-    // GETTERS (derivati dallo stato, non memorizzati)
+    // GETTERS — derived state, never stored
     // ─────────────────────────────────────────────
 
     get hasData()    { return !this.isLoading && !this.hasError && this.records.length > 0; }
@@ -85,9 +117,8 @@ export default class AccountTable extends LightningElement {
     get isFirstPage(){ return this.currentPage <= 1; }
     get isLastPage() { return this.currentPage >= this.totalPages; }
 
-    get selectedCount()     { return this.selectedIds.size; }
+    get selectedCount()        { return this.selectedIds.size; }
     get isMassUpdateDisabled() { return this.selectedIds.size === 0; }
-    get selectionLabel()    { return `${this.selectedIds.size} record selezionati`; }
 
     get allSelected() {
         if (this.records.length === 0) return false;
@@ -95,18 +126,19 @@ export default class AccountTable extends LightningElement {
     }
 
     get pageSizeOptions() { return PAGE_SIZE_OPTIONS; }
-    // lightning-combobox richiede che value sia una stringa, non un intero
-    get pageSizeString()  { return String(this._pageSize); }
+
+    /** lightning-combobox requires value to be a string, not an integer. */
+    get pageSizeString() { return String(this._pageSize); }
 
     // ─────────────────────────────────────────────
     // DATA LOADING
     // ─────────────────────────────────────────────
 
     /**
-     * @description Chiama Apex in modo imperativo e aggiorna lo stato locale.
-     *              Usiamo chiamata imperativa (non @wire) perché i parametri
-     *              cambiano dinamicamente (sort, page) e @wire non si adatta
-     *              bene a parametri mutevoli senza @wire refresh.
+     * @description Calls Apex imperatively and updates local state.
+     *              Sets isLoading before the call and clears it in the finally
+     *              block so the spinner is always shown/hidden correctly,
+     *              regardless of whether the call succeeds or fails.
      */
     async loadAccounts() {
         this.isLoading    = true;
@@ -124,7 +156,7 @@ export default class AccountTable extends LightningElement {
             this.totalPages   = result.totalPages;
             this.totalRecords = result.totalRecords;
 
-            // Arricchisce ogni record con proprietà UI
+            // Enrich each SOQL record with UI-only properties not present in Apex
             this.records = result.records.map(acc => ({
                 ...acc,
                 isSelected:     this.selectedIds.has(acc.Id),
@@ -135,20 +167,24 @@ export default class AccountTable extends LightningElement {
 
         } catch (error) {
             this.errorMessage = this._extractErrorMessage(error);
-            this._showToast('Errore', this.errorMessage, 'error');
+            this._showToast('Error', this.errorMessage, 'error');
         } finally {
             this.isLoading = false;
         }
     }
 
     // ─────────────────────────────────────────────
-    // HANDLERS: SORTING
+    // HANDLERS — SORTING
     // ─────────────────────────────────────────────
 
     handleSort(event) {
         const clickedField = event.currentTarget.dataset.field;
 
-        // Toggle direction se stesso campo, altrimenti ASC di default
+        // Guard: ignore clicks on non-sortable columns (e.g. Description)
+        const col = this.columns.find(c => c.fieldName === clickedField);
+        if (!col || !col.sortable) return;
+
+        // Toggle direction on the same column; default to ASC for a new column
         if (this.sortField === clickedField) {
             this.sortDirection = (this.sortDirection === 'ASC') ? 'DESC' : 'ASC';
         } else {
@@ -156,7 +192,7 @@ export default class AccountTable extends LightningElement {
             this.sortDirection = 'ASC';
         }
 
-        // Aggiorna indicatori visivi nelle colonne
+        // Rebuild column state with updated sort indicators and CSS classes
         this.columns = this.columns.map(col => ({
             ...col,
             isSorted: col.fieldName === this.sortField,
@@ -165,43 +201,41 @@ export default class AccountTable extends LightningElement {
                 : '',
             ariaSort: col.fieldName === this.sortField
                 ? (this.sortDirection === 'ASC' ? 'ascending' : 'descending')
-                : 'none'
+                : 'none',
+            thClass: col.sortable ? 'at-th at-th--sort' : 'at-th'
         }));
 
-        // Ritorna alla pagina 1 quando cambia l'ordinamento
+        // Reset to page 1 so the user sees the first results of the new sort order
         this.currentPage = 1;
         this.loadAccounts();
     }
 
     // ─────────────────────────────────────────────
-    // HANDLERS: PAGINAZIONE
+    // HANDLERS — PAGINATION
     // ─────────────────────────────────────────────
 
-    handleFirst()    { this.currentPage = 1;               this.loadAccounts(); }
-    handleLast()     { this.currentPage = this.totalPages;  this.loadAccounts(); }
-    handlePrevious() { this.currentPage = Math.max(1, this.currentPage - 1); this.loadAccounts(); }
+    handleFirst()    { this.currentPage = 1;                                            this.loadAccounts(); }
+    handleLast()     { this.currentPage = this.totalPages;                              this.loadAccounts(); }
+    handlePrevious() { this.currentPage = Math.max(1, this.currentPage - 1);            this.loadAccounts(); }
     handleNext()     { this.currentPage = Math.min(this.totalPages, this.currentPage + 1); this.loadAccounts(); }
 
     handlePageSizeChange(event) {
-        // lightning-combobox espone il valore su event.detail.value (stringa)
-        const raw = event.detail.value;
-        const parsed = parseInt(raw, 10);
-
-
-        this._pageSize   = parsed;
-        this.currentPage = 1;
+        // lightning-combobox exposes the selected value on event.detail.value (string)
+        this._pageSize   = parseInt(event.detail.value, 10);
+        this.currentPage = 1; // Reset to page 1 when page size changes
         this.loadAccounts();
     }
 
     // ─────────────────────────────────────────────
-    // HANDLERS: SELEZIONE
+    // HANDLERS — SELECTION
     // ─────────────────────────────────────────────
 
     handleRowSelect(event) {
         const accountId = event.target.dataset.id;
         const checked   = event.target.checked;
 
-        // Usiamo una nuova Map per triggherare la reattività LWC
+        // Create a new Map (instead of mutating the existing one) to trigger
+        // LWC reactivity — @track only detects reassignment, not internal mutation.
         const newMap = new Map(this.selectedIds);
         if (checked) {
             newMap.set(accountId, true);
@@ -210,7 +244,7 @@ export default class AccountTable extends LightningElement {
         }
         this.selectedIds = newMap;
 
-        // Aggiorna lo stato isSelected sui record visualizzati
+        // Sync the isSelected and rowClass flags on the visible records
         this.records = this.records.map(r => ({
             ...r,
             isSelected: newMap.has(r.Id),
@@ -235,13 +269,14 @@ export default class AccountTable extends LightningElement {
     }
 
     // ─────────────────────────────────────────────
-    // HANDLERS: MASS UPDATE
+    // HANDLERS — MASS UPDATE
     // ─────────────────────────────────────────────
 
     async handleMassUpdate() {
         if (this.selectedIds.size === 0) return;
 
-        const newDescription = `Update ${new Date().toLocaleString('it-IT')}`;
+        // Build the new description value with the current timestamp
+        const newDescription = `Updated on ${new Date().toLocaleString('en-GB')}`;
         const ids = Array.from(this.selectedIds.keys());
 
         this.isLoading = true;
@@ -253,27 +288,29 @@ export default class AccountTable extends LightningElement {
             });
 
             if (result.success) {
-                this._showToast('Successo', result.message, 'success');
-                // Deseleziona tutto dopo un aggiornamento riuscito
+                this._showToast('Success', result.message, 'success');
+                // Clear all selections after a successful update
                 this.selectedIds = new Map();
                 await this.loadAccounts();
             } else {
-                this._showToast('Attenzione', result.message, 'warning');
+                this._showToast('Warning', result.message, 'warning');
             }
 
         } catch (error) {
-            this._showToast('Errore', this._extractErrorMessage(error), 'error');
+            this._showToast('Error', this._extractErrorMessage(error), 'error');
         } finally {
             this.isLoading = false;
         }
     }
 
     // ─────────────────────────────────────────────
-    // UTILITY PRIVATE
+    // PRIVATE UTILITIES
     // ─────────────────────────────────────────────
 
     /**
-     * @description Mappa il campo Type a una classe CSS badge colorata.
+     * @description Maps the Account Type field value to a CSS badge modifier class.
+     *              Matching is case-insensitive and substring-based to handle
+     *              values like 'Customer - Direct' and 'Customer - Channel'.
      */
     _getTypeBadgeClass(type) {
         if (!type) return 'at-type at-type--other';
@@ -285,18 +322,19 @@ export default class AccountTable extends LightningElement {
     }
 
     /**
-     * @description Estrae il messaggio di errore leggibile da un'eccezione Apex.
-     *              Gli errori Apex hanno struttura diversa dagli errori JS standard.
+     * @description Extracts a human-readable message from an Apex error object.
+     *              Apex errors have a different structure than standard JS errors:
+     *              the message is nested under error.body.message.
      */
     _extractErrorMessage(error) {
         if (typeof error === 'string') return error;
-        if (error?.body?.message) return error.body.message;
-        if (error?.message)       return error.message;
-        return 'Si è verificato un errore imprevisto.';
+        if (error?.body?.message)      return error.body.message;
+        if (error?.message)            return error.message;
+        return 'An unexpected error occurred.';
     }
 
     /**
-     * @description Wrapper per ShowToastEvent per evitare ripetizioni.
+     * @description Convenience wrapper around ShowToastEvent to avoid repetition.
      */
     _showToast(title, message, variant) {
         this.dispatchEvent(new ShowToastEvent({ title, message, variant }));

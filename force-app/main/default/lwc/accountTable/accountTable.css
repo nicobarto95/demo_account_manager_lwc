@@ -1,10 +1,14 @@
 /* ================================================================
-   accountTable.css — Design System Aziendale
-   Palette: Blu navy (#0F172A) + Azzurro (#3B82F6) + Slate grigi
-   Font: system-ui stack (compatibile con SLDS senza import esterni)
+   accountTable.css — Component Design System
+   Palette  : Navy (#0F172A) + Blue (#3B82F6) + Slate greys
+   Font     : system-ui stack — no external imports, always available
+   Naming   : BEM-inspired prefix "at-" (accountTable) to avoid
+              collisions with SLDS global styles
    ================================================================ */
 
-/* ── Variabili ─────────────────────────────────────────────────── */
+/* ── CSS Custom Properties ──────────────────────────────────────── */
+/* Defined on :host so they are scoped to this component's shadow DOM
+   and can be overridden from outside via CSS custom property inheritance. */
 :host {
     --at-blue:        #3B82F6;
     --at-blue-dark:   #1D4ED8;
@@ -28,183 +32,213 @@
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
-/* ── lightning-combobox nel footer (larghezza fissa, no overflow) ── */
+/* ── lightning-combobox — fixed width, no layout overflow ────────── */
 .at-combobox {
     width: 80px;
     display: block;
 }
 
-/* ── Override lightning-button nell'header scuro ────────────────── */
+/* ── lightning-button — brand colour override for dark header ────── */
 .at-mass-btn {
-    --slds-c-button-brand-color-background: var(--at-blue);
+    --slds-c-button-brand-color-background:       var(--at-blue);
     --slds-c-button-brand-color-background-hover: var(--at-blue-dark);
 }
 
-/* ── Wrapper ────────────────────────────────────────────────────── */
+/* ── Outer wrapper ──────────────────────────────────────────────── */
 .at-wrapper {
     padding: 1.5rem;
 }
 
 /* ── Card ───────────────────────────────────────────────────────── */
+/*
+   overflow: visible is intentional.
+   overflow: hidden (the common default for border-radius clipping) would
+   clip the lightning-combobox dropdown because it renders outside the card
+   boundaries. Setting visible allows dropdowns to escape the card box.
+*/
 .at-card {
-    background: var(--at-white);
+    background:    var(--at-white);
     border-radius: var(--at-radius);
-    box-shadow: var(--at-shadow-lg);
-    overflow: visible;        /* FIX: era hidden, bloccava il dropdown del combobox */
-    border: 1px solid var(--at-slate-300);
+    box-shadow:    var(--at-shadow-lg);
+    overflow:      visible;
+    border:        1px solid var(--at-slate-300);
 }
 
 /* ── Header ─────────────────────────────────────────────────────── */
 .at-card__header {
-    display: flex;
-    align-items: center;
+    display:         flex;
+    align-items:     center;
     justify-content: space-between;
-    padding: 1.25rem 1.5rem;
-    background: linear-gradient(135deg, var(--at-navy) 0%, #1E3A5F 100%);
-    border-bottom: 3px solid var(--at-blue);
+    padding:         1.25rem 1.5rem;
+    background:      linear-gradient(135deg, var(--at-navy) 0%, #1E3A5F 100%);
+    border-bottom:   3px solid var(--at-blue);
+    /* Clip the gradient to rounded top corners without affecting the body */
+    border-radius:   var(--at-radius) var(--at-radius) 0 0;
 }
 
 .at-header__left {
-    display: flex;
+    display:     flex;
     align-items: center;
-    gap: .875rem;
+    gap:         .875rem;
 }
 
 .at-header__icon {
-    background: rgba(255,255,255,.12);
-    border-radius: 10px;
-    padding: .5rem;
-    display: flex;
-    align-items: center;
+    background:      rgba(255,255,255,.12);
+    border-radius:   10px;
+    padding:         .5rem;
+    display:         flex;
+    align-items:     center;
     justify-content: center;
 }
 
 .at-header__title {
-    font-size: 1.125rem;
-    font-weight: 700;
-    color: var(--at-white);
-    margin: 0;
+    font-size:      1.125rem;
+    font-weight:    700;
+    color:          var(--at-white);
+    margin:         0;
     letter-spacing: -.01em;
 }
 
 .at-header__subtitle {
     font-size: .75rem;
-    color: rgba(255,255,255,.55);
-    margin: .125rem 0 0;
+    color:     rgba(255,255,255,.55);
+    margin:    .125rem 0 0;
 }
 
 .at-header__right {
-    display: flex;
+    display:     flex;
     align-items: center;
-    gap: .75rem;
+    gap:         .75rem;
 }
 
-/* ── Badge selezionati ──────────────────────────────────────────── */
+/* ── Selection badge ─────────────────────────────────────────────── */
 .at-badge {
-    display: inline-flex;
-    align-items: center;
-    padding: .25rem .625rem;
-    border-radius: 999px;
-    font-size: .75rem;
-    font-weight: 600;
+    display:        inline-flex;
+    align-items:    center;
+    padding:        .25rem .625rem;
+    border-radius:  999px;
+    font-size:      .75rem;
+    font-weight:    600;
     letter-spacing: .02em;
 }
 
 .at-badge--selected {
     background: rgba(59,130,246,.25);
-    color: #93C5FD;
-    border: 1px solid rgba(59,130,246,.4);
+    color:      #93C5FD;
+    border:     1px solid rgba(59,130,246,.4);
 }
 
-/* ── Pulsante primary ───────────────────────────────────────────── */
+/* ── Generic button base (kept for reference; Mass Update uses lightning-button) */
 .at-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: .375rem;
-    padding: .5rem 1rem;
-    border: none;
-    border-radius: var(--at-radius-sm);
-    font-size: .8125rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background .15s, transform .1s, box-shadow .15s;
-    white-space: nowrap;
+    display:        inline-flex;
+    align-items:    center;
+    gap:            .375rem;
+    padding:        .5rem 1rem;
+    border:         none;
+    border-radius:  var(--at-radius-sm);
+    font-size:      .8125rem;
+    font-weight:    600;
+    cursor:         pointer;
+    transition:     background .15s, transform .1s, box-shadow .15s;
+    white-space:    nowrap;
 }
 
 .at-btn--primary {
     background: var(--at-blue);
-    color: var(--at-white);
+    color:      var(--at-white);
     box-shadow: 0 2px 8px rgba(59,130,246,.35);
 }
 
 .at-btn--primary:hover:not(:disabled) {
-    background: var(--at-blue-dark);
-    box-shadow: 0 4px 12px rgba(59,130,246,.45);
-    transform: translateY(-1px);
+    background:  var(--at-blue-dark);
+    box-shadow:  0 4px 12px rgba(59,130,246,.45);
+    transform:   translateY(-1px);
 }
 
 .at-btn--primary:disabled {
     background: var(--at-slate-300);
-    color: var(--at-slate-500);
-    cursor: not-allowed;
+    color:      var(--at-slate-500);
+    cursor:     not-allowed;
     box-shadow: none;
 }
 
-/* ── Body ───────────────────────────────────────────────────────── */
+/* ── Card body ──────────────────────────────────────────────────── */
 .at-card__body {
     padding: 0;
 }
 
-/* ── Tabella scroll container ───────────────────────────────────── */
+/* ── Table scroll wrapper ───────────────────────────────────────── */
+/* overflow-x: auto adds a horizontal scrollbar on narrow viewports
+   without affecting the vertical dropdown behaviour of the footer. */
 .at-table-scroll {
     overflow-x: auto;
-    width: 100%;
+    width:      100%;
 }
 
-/* ── Tabella ────────────────────────────────────────────────────── */
+/* ── Table ──────────────────────────────────────────────────────── */
 .at-table {
-    width: 100%;
+    width:           100%;
     border-collapse: collapse;
-    font-size: .875rem;
-    color: var(--at-slate-700);
+    font-size:       .875rem;
+    color:           var(--at-slate-700);
 }
 
-/* Header tabella */
+/* ── Table header cells ─────────────────────────────────────────── */
 .at-th {
-    padding: .75rem 1rem;
-    text-align: left;
-    font-size: .6875rem;
-    font-weight: 700;
+    padding:        .75rem 1rem;
+    text-align:     left;
+    font-size:      .6875rem;
+    font-weight:    700;
     text-transform: uppercase;
     letter-spacing: .06em;
-    color: var(--at-slate-500);
-    background: var(--at-slate-100);
-    border-bottom: 2px solid var(--at-slate-300);
-    white-space: nowrap;
-    user-select: none;
+    color:          var(--at-slate-500);
+    background:     var(--at-slate-100);
+    border-bottom:  2px solid var(--at-slate-300);
+    white-space:    nowrap;
+    user-select:    none;
 }
 
-.at-th--chk { width: 44px; text-align: center; }
+/* Checkbox column header */
+.at-th--chk {
+    width:      44px;
+    text-align: center;
+}
 
-.at-th--sort { cursor: pointer; }
-.at-th--sort:hover { color: var(--at-blue); background: var(--at-blue-light); }
+/* Sortable column header — pointer cursor + blue hover */
+.at-th--sort {
+    cursor: pointer;
+}
+.at-th--sort:hover {
+    color:      var(--at-blue);
+    background: var(--at-blue-light);
+}
+
+/* Non-sortable column header (e.g. Description) — no interaction affordance */
+.at-th:not(.at-th--sort) {
+    cursor: default;
+}
+.at-th:not(.at-th--sort):hover {
+    color:      var(--at-slate-500);
+    background: var(--at-slate-100);
+}
 
 .at-th__inner {
-    display: inline-flex;
+    display:     inline-flex;
     align-items: center;
-    gap: .375rem;
+    gap:         .375rem;
 }
 
+/* Sort direction indicator (▲ / ▼) */
 .at-th__sort {
-    font-size: .75rem;
-    color: var(--at-blue);
-    min-width: 10px;
+    font-size:  .75rem;
+    color:      var(--at-blue);
+    min-width:  10px;
 }
 
-/* Righe */
+/* ── Table body rows ─────────────────────────────────────────────── */
 .at-table tbody tr {
     border-bottom: 1px solid var(--at-slate-100);
-    transition: background .1s;
+    transition:    background .1s;
 }
 
 .at-table tbody tr:hover {
@@ -215,183 +249,184 @@
     border-bottom: none;
 }
 
-/* Riga selezionata */
+/* Selected row — blue highlight + left accent border */
 .at-row--selected {
-    background: #EFF6FF !important;
-    border-left: 3px solid var(--at-blue);
+    background:   #EFF6FF !important;
+    border-left:  3px solid var(--at-blue);
 }
 
+/* ── Table data cells ────────────────────────────────────────────── */
 .at-td {
-    padding: .75rem 1rem;
+    padding:        .75rem 1rem;
     vertical-align: middle;
 }
 
-.at-td--chk { width: 44px; text-align: center; }
+.at-td--chk  { width: 44px; text-align: center; }
 .at-td--name { font-weight: 500; }
 .at-td--date { color: var(--at-slate-500); font-size: .8125rem; white-space: nowrap; }
 
+/* Description cell — truncates long text with an ellipsis to preserve layout */
 .at-td--description { max-width: 220px; }
+
 .at-description {
-    display: block;
-    white-space: nowrap;
-    overflow: hidden;
+    display:       block;
+    white-space:   nowrap;
+    overflow:      hidden;
     text-overflow: ellipsis;
-    max-width: 220px;
-    font-size: .8125rem;
-    color: var(--at-slate-500);
-    font-style: italic;
+    max-width:     220px;
+    font-size:     .8125rem;
+    color:         var(--at-slate-500);
+    font-style:    italic;
 }
 
-/* ── Link account ───────────────────────────────────────────────── */
+/* ── Account link ────────────────────────────────────────────────── */
 .at-link {
-    color: var(--at-blue);
+    color:           var(--at-blue);
     text-decoration: none;
-    font-weight: 600;
+    font-weight:     600;
 }
-.at-link:hover { text-decoration: underline; color: var(--at-blue-dark); }
+.at-link:hover {
+    text-decoration: underline;
+    color:           var(--at-blue-dark);
+}
 
-/* ── Badge Type ─────────────────────────────────────────────────── */
+/* ── Type badges ─────────────────────────────────────────────────── */
+/* Base pill style shared by all type variants */
 .at-type {
-    display: inline-block;
-    padding: .2rem .6rem;
-    border-radius: 999px;
-    font-size: .7rem;
-    font-weight: 700;
+    display:        inline-block;
+    padding:        .2rem .6rem;
+    border-radius:  999px;
+    font-size:      .7rem;
+    font-weight:    700;
     text-transform: uppercase;
     letter-spacing: .04em;
-    white-space: nowrap;
+    white-space:    nowrap;
 }
-.at-type--customer  { background: var(--at-green-bg);  color: var(--at-green); }
-.at-type--prospect  { background: var(--at-orange-bg); color: var(--at-orange); }
-.at-type--partner   { background: var(--at-blue-light); color: var(--at-blue); }
-.at-type--other     { background: var(--at-slate-100);  color: var(--at-slate-500); }
 
-/* ── Nil ────────────────────────────────────────────────────────── */
+/* Colour variants — matched in JS via _getTypeBadgeClass() */
+.at-type--customer { background: var(--at-green-bg);   color: var(--at-green);  }
+.at-type--prospect { background: var(--at-orange-bg);  color: var(--at-orange); }
+.at-type--partner  { background: var(--at-blue-light); color: var(--at-blue);   }
+.at-type--other    { background: var(--at-slate-100);  color: var(--at-slate-500); }
+
+/* ── Empty value placeholder ─────────────────────────────────────── */
 .at-nil { color: var(--at-slate-300); }
 
-/* ── Checkbox ───────────────────────────────────────────────────── */
+/* ── Checkboxes ──────────────────────────────────────────────────── */
 .at-chk {
-    width: 16px;
-    height: 16px;
-    cursor: pointer;
-    accent-color: var(--at-blue);
+    width:        16px;
+    height:       16px;
+    cursor:       pointer;
+    accent-color: var(--at-blue); /* Tints the native checkbox with the brand colour */
 }
 
-/* ── Stato (loading/errore/vuoto) ───────────────────────────────── */
+/* ── State containers (loading / error / empty) ─────────────────── */
 .at-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+    display:         flex;
+    flex-direction:  column;
+    align-items:     center;
     justify-content: center;
-    gap: 1rem;
-    padding: 4rem 2rem;
+    gap:             1rem;
+    padding:         4rem 2rem;
 }
+
 .at-state--error { color: var(--at-red); }
+
 .at-state__text {
     font-size: .875rem;
-    color: var(--at-slate-500);
-    margin: 0;
+    color:     var(--at-slate-500);
+    margin:    0;
 }
 
 /* ════════════════════════════════════════════════════════════════
-   FOOTER PAGINAZIONE — Layout a 3 colonne con flex, NO overflow
+   PAGINATION FOOTER
+   Three-column flex layout: info | nav buttons | rows selector.
+   overflow: visible + position: relative allow the lightning-combobox
+   dropdown to render above the footer without being clipped.
    ════════════════════════════════════════════════════════════════ */
 .at-footer {
-    display: flex;
-    align-items: center;
+    display:         flex;
+    align-items:     center;
     justify-content: space-between;
-    padding: .875rem 1.25rem;
-    border-top: 1px solid var(--at-slate-100);
-    background: var(--at-slate-100);
-    gap: 1rem;
-    flex-wrap: nowrap;
-    overflow: visible;        /* FIX: permette al dropdown di aprirsi fuori dai bordi */
-    position: relative;       /* FIX: contesto per il posizionamento del dropdown */
+    padding:         .875rem 1.25rem;
+    border-top:      1px solid var(--at-slate-100);
+    background:      var(--at-slate-100);
+    gap:             1rem;
+    flex-wrap:       nowrap;
+    overflow:        visible;
+    position:        relative;
 }
 
-/* Colonna sinistra: info pagina */
+/* Left column — page label */
 .at-footer__info {
-    font-size: .8rem;
-    color: var(--at-slate-500);
+    font-size:   .8rem;
+    color:       var(--at-slate-500);
     white-space: nowrap;
-    flex: 0 0 auto;
+    flex:        0 0 auto;
 }
 
-/* Colonna centro: bottoni nav */
+/* Centre column — navigation buttons */
 .at-footer__nav {
-    display: flex;
+    display:     flex;
     align-items: center;
-    gap: .25rem;
-    flex: 0 0 auto;
+    gap:         .25rem;
+    flex:        0 0 auto;
 }
 
+/* Current page indicator pill */
 .at-footer__cur {
-    min-width: 2rem;
-    text-align: center;
-    font-size: .875rem;
-    font-weight: 700;
-    color: var(--at-blue);
-    background: var(--at-white);
-    border: 1px solid var(--at-blue);
+    min-width:     2rem;
+    text-align:    center;
+    font-size:     .875rem;
+    font-weight:   700;
+    color:         var(--at-blue);
+    background:    var(--at-white);
+    border:        1px solid var(--at-blue);
     border-radius: var(--at-radius-sm);
-    padding: .25rem .5rem;
+    padding:       .25rem .5rem;
 }
 
-/* Bottoni pagina */
+/* Navigation buttons (« ‹ › ») */
 .at-pgbtn {
-    width: 32px;
-    height: 32px;
-    border: 1px solid var(--at-slate-300);
+    width:         32px;
+    height:        32px;
+    border:        1px solid var(--at-slate-300);
     border-radius: var(--at-radius-sm);
-    background: var(--at-white);
-    color: var(--at-slate-700);
-    font-size: 1rem;
-    line-height: 1;
-    cursor: pointer;
-    transition: all .15s;
-    display: flex;
-    align-items: center;
+    background:    var(--at-white);
+    color:         var(--at-slate-700);
+    font-size:     1rem;
+    line-height:   1;
+    cursor:        pointer;
+    transition:    all .15s;
+    display:       flex;
+    align-items:   center;
     justify-content: center;
-    padding: 0;
+    padding:       0;
 }
+
 .at-pgbtn:hover:not(:disabled) {
-    background: var(--at-blue);
-    color: var(--at-white);
+    background:   var(--at-blue);
+    color:        var(--at-white);
     border-color: var(--at-blue);
 }
+
 .at-pgbtn:disabled {
     opacity: .35;
-    cursor: not-allowed;
+    cursor:  not-allowed;
 }
 
-/* Colonna destra: selettore righe — FIX rispetto alla versione precedente */
+/* Right column — rows-per-page selector */
+/* flex: 0 0 auto prevents this column from stretching or shrinking,
+   which was the root cause of the original layout overflow bug. */
 .at-footer__size {
-    display: flex;
+    display:     flex;
     align-items: center;
-    gap: .5rem;
-    flex: 0 0 auto;            /* non si espande, non si restringe */
+    gap:         .5rem;
+    flex:        0 0 auto;
 }
 
 .at-footer__size-lbl {
-    font-size: .75rem;
-    color: var(--at-slate-500);
+    font-size:   .75rem;
+    color:       var(--at-slate-500);
     white-space: nowrap;
-}
-
-.at-select {
-    height: 32px;
-    padding: 0 .5rem;
-    border: 1px solid var(--at-slate-300);
-    border-radius: var(--at-radius-sm);
-    background: var(--at-white);
-    color: var(--at-slate-700);
-    font-size: .8125rem;
-    cursor: pointer;
-    outline: none;
-    transition: border-color .15s;
-    width: 64px;               /* larghezza fissa: no overflow */
-}
-.at-select:focus {
-    border-color: var(--at-blue);
-    box-shadow: 0 0 0 2px rgba(59,130,246,.2);
 }
